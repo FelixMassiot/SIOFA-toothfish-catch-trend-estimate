@@ -1,7 +1,25 @@
-.Rproj.user
+# R / RStudio
+.Rproj.user/
 .Rhistory
 .RData
 .Ruserdata
+
+# OS files
+Thumbs.db
+
+# Ignore all files in Output and Data (keep folders)
+Output/*
+Data/*
+
+# Allow folder structure to be tracked
+!Output/.gitkeep
+!Data/.gitkeep
+
+# Other project-specific ignores
+Reports/
+
+
+
 #*Output*
 #*Trends_*
 #*Diagram_*
@@ -9,5 +27,3 @@
 #*Biomass_Estimation_ReportCard*
 #*Migrants*
 *Decisions_History*
-Reports/
-Thumbs.db

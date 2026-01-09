@@ -1,12 +1,15 @@
-#-------------------------------------------------------------------------------
-## Estimate biomass
-#-------------------------------------------------------------------------------
+
+# 02_Estimate biomass.R
+
 cat("CPUE start", sep = "\n")
 
 #to do/check :
 #1. rev extract_catch_data_cpue_est function
 
-# Estimate Biomass using CPUE####
+
+
+# 1. Estimate Biomass using CPUE ---------------------------------------------
+
 store_biomass_estimate=NULL
 for(RA in RefArea){
   cat(" || ");cat(RA);cat(" : ")
@@ -28,7 +31,7 @@ for (RB in Mu){
   Catch_RB_CPUE=Catch_RB_CPUE[,c("Season","opeID","speciesFAOCode",
                                  "Catch_Kg", "Weigth","HooksSet",
                                  "fishopSetStartLongitude","fishopSetStartLatitude",
-                                 'fishopSetEndLongitude','fishopSetEndLatitude')] # "line_length"
+                                 'fishopSetEndLongitude','fishopSetEndLatitude','LineLenght')] # "line_length"
   
   ############ Set Ref_area 
   #Ref_area= RA # ifelse(RB%in%TOP_target_RBs,"HIMI","RSR_open")
@@ -72,15 +75,26 @@ for (RB in Mu){
   for (y in Survey_est){
     
     # select the last three seasons, prior to and including y, in which fishing occurred 
-    Seasons=tail(Survey_est[Survey_est<=y],3)
+    if(Tail){
+    Seasons=tail(Survey_est[Survey_est<=y],3) # FMG Change this !
+    }else{
+    Seasons=Survey_est[Survey_est==y]
+        
+    }
     
     #run extract_catch_data_cpue_est on RB data
-    Catch_RB_CPUE$Catch =  rowSums(cbind(Catch_RB_CPUE$Catch_Kg , Catch_RB_CPUE$Weigth),na.rm=T)
+   
+
+     Catch_RB_CPUE$Catch =  rowSums(cbind(Catch_RB_CPUE$Catch_Kg , Catch_RB_CPUE$Weigth),na.rm=T)
+
+      
+      
+    # Catch_RB_CPUE$DistLL = 
+    #   sapply(1:nrow(Catch_RB_CPUE),function(i)
+    #     distGeo(as.data.frame(Catch_RB_CPUE)[i,c('fishopSetStartLongitude','fishopSetStartLatitude')],
+    #             as.data.frame(Catch_RB_CPUE)[i,c('fishopSetEndLongitude','fishopSetEndLatitude')]))
     
-    Catch_RB_CPUE$DistLL = 
-      sapply(1:nrow(Catch_RB_CPUE),function(i)
-        distGeo(as.data.frame(Catch_RB_CPUE)[i,c('fishopSetStartLongitude','fishopSetStartLatitude')],
-                as.data.frame(Catch_RB_CPUE)[i,c('fishopSetEndLongitude','fishopSetEndLatitude')]))
+    Catch_RB_CPUE$DistLL = Catch_RB_CPUE$LineLenght
     
     if(CPUE_mod == 'dist'){
       Haul_RB_CPUE = Catch_RB_CPUE %>% filter(Season%in%Seasons) %>% 
@@ -180,8 +194,9 @@ cat("CPUE end", sep = "\n")
 
 
 
-#####
-# Estimate local biomass using the Chapman mark-recapture method####
+
+
+# 2. Estimate local biomass using the Chapman mark-recapture meth --------
 
 cat("Chapman start", sep = "\n")
 
@@ -403,5 +418,5 @@ Check Links filtering when producing Flinks
   rm(store_annual_estimates)
   rm(store_biomass_estimate_chapman,store_biomass_estimates_chapman,store_biomass_estimates_CPUE)
   rm(n_boot)
-  #####
+
   

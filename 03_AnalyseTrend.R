@@ -1,6 +1,4 @@
-#-------------------------------------------------------------------------------
-## Trend analysis
-#-------------------------------------------------------------------------------
+# 03_AnayseTrend.R
 
 cat("Trend analysis start", sep = "\n")
 
@@ -63,7 +61,7 @@ B_Recent_CPUE=B_Recent[B_Recent$Method=="CPUE-by-seabed area",c("RB","Est")]
 B_Recent_Chap=B_Recent[B_Recent$Method=='Chapman',c("RB","Est")]
   
 
-#CPUE trends--------------------------------------------------------------------
+#1. CPUE trends--------------------------------------------------------------------
 CPUE_trends=NULL 
 for (r in unique(Mu)){
   
@@ -88,7 +86,7 @@ for (r in unique(Mu)){
 }
 
 
-#Chapman trends-----------------------------------------------------------------
+# 2. Chapman trends-----------------------------------------------------------------
 Chap_trends=NULL
 for (r in unique(Mu)){
   if(dim(Chap_est[Chap_est$RB == r,])[1] == 0){
@@ -156,7 +154,7 @@ trends$Area[grep("SIR",trends$RB)]="3b"
 
 
 
-#Plot recent trends per Area----------------------------------------------------
+# 3. Plot recent trends per Area----------------------------------------------------
 for(a in sort(unique(trends$Area))){
   
   rbs=unique(trends$RB[trends$Area==a])
@@ -285,7 +283,7 @@ rm(mod2_beta,mod4_beta,model.2,model.4,out)
 rm(tmp_ch,tmp_cp,b_ch,b_cp,mf,r,rbs,suff_recaps,XL,YL)
 
 
-#Trend decision-----------------------------------------------------------------
+# 4. Trend decision-----------------------------------------------------------------
 b_th=0.1 #beta threshold
 trends$Trend_Decision=NA
 #Declining:
@@ -486,7 +484,7 @@ write.csv(trends, paste0("Output/Trends_",Est_Season,"_and_CLs_",Time,".csv"),ro
 # trends=read.csv(paste0("Output/Trends_",Est_Season,"_and_CLs_",Time,".csv"),check.names = F)
 
 
-#Build diagram------------------------------------------------------------------
+# 5. Build diagram------------------------------------------------------------------
 save_png <- function(plot, path){
   DiagrammeRsvg::export_svg(plot) %>%
     charToRaw() %>%

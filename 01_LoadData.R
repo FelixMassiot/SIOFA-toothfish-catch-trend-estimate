@@ -1,6 +1,6 @@
-#-------------------------------------------------------------------------------
-## Load Data from 
-#-------------------------------------------------------------------------------
+
+# 01_LoadData.R 
+
 
 #to do/check :
 #1. Script/function to ensure that the catch, tagging and biological have the same format 
@@ -16,7 +16,7 @@ Ref_area_seabed = fishable_area[fishable_area$Poly%in%c(RefArea),]
 # MU
 RB_area_seabed = fishable_area[fishable_area$Poly%in%Mu,]
 
-#Get spatial objects ------------------------------------------------------------
+# Get spatial objects ------------------------------------------------------------
 
 # RefAreas 
 RefAreas=st_read(dsn=path.expand(paste0(getwd(),'/Data')), layer="RefAreas", quiet = TRUE)
@@ -26,7 +26,7 @@ DelCano=st_read(dsn=path.expand(paste0(getwd(),'/Data')), layer="DelCano", quiet
 SIR=st_read(dsn=path.expand(paste0(getwd(),'/Data')), layer="SIR", quiet = TRUE)
 MU=st_read(dsn=path.expand(paste0(getwd(),'/Data')), layer="PolysMU", quiet = TRUE)
  
-#Biomass and CV for Reference Areas history ------------------------------------
+# Biomass and CV for Reference Areas history ------------------------------------
 
 # 2021-2023:
 # HIMI_biomass_est=31111 
@@ -55,15 +55,14 @@ tag_pars=list("mean_wt"=0,
                   "chronic_shed"=0.0084,
                   "chronic_mort"=0)
 
-#Source disambiguator (Used to merge ambiguous links that share season and RB)
+# Source disambiguator (Used to merge ambiguous links that share season and RB)
 source("Functions/Disambiguator.R")
 
-#################################################################################################################
 
-#Initialize Report card####
-#Open Report Card
+# Initialize Report card
+# Open Report Card
 Rcard = file(paste0('Output/Biomass_Estimation_ReportCard_',as.character(Time),'.txt'),"w")
-#Write Header 
+# Write Header 
 cat("Biomass Estimation Report Card", file = Rcard, sep = "\n")
 cat(paste0('Date: ',Time), file = Rcard, sep = "\n")
 cat("--------------------------------------------", file = Rcard, sep = "\n")
@@ -71,22 +70,32 @@ cat("", file = Rcard, sep = "\n")
 #####
 
 
-#Load Data ---------------------------------------------------------------------
+# Load Data ---------------------------------------------------------------------
 
 # catch and effort 
-LL= read_excel( "Data/SIOFA_3b_Toothfish_catch_effort.xlsx")
+LL= read_excel( "Data/SIOFA_3b_Toothfish_catch_effort-2025.xlsx")
 
 # tagging 
-Rel= read_excel( "Data/SIOFA_3b_tagging.xlsx",sheet ='tag_release_3b')
-Rec= read_excel( "Data/SIOFA_3b_tagging.xlsx",sheet ='tag_recapture_3b')
-Rlink= read_excel( "Data/SIOFA_3b_tagging.xlsx",sheet ='tag_linking')
+Rel= read_excel( "Data/SIOFA_3b_tagging-2025.xlsx",sheet ='tag_release')
+Rec= read_excel( "Data/SIOFA_3b_tagging-2025.xlsx",sheet ='tag_recapture')
+Rlink= read_excel( "Data/SIOFA_3b_tagging-2025.xlsx",sheet ='tag_linking')
 
-# link tag fished and set
-LinkOP_release= read_excel( "Data/SIOFA_3b_tag_operation_link.xlsx",sheet ='tag_release')
-LinkOP_recapture= read_excel( "Data/SIOFA_3b_tag_operation_link.xlsx",sheet ='tag_recapture')
+# link tag fished and set"~/Travail/CC-ORGP/SIOFA/Workshop-Trend analysis 2025/R/SIFOA Workshop Analysis/Data/Marco_SIOFA/SIOFA_all_tag_operation_link-2025_rev1.xlsx"
+LinkOP_release= read_excel( "Data/SIOFA_all_tag_operation_link-2025_rev1.xlsx",sheet ='tag_release')
+LinkOP_recapture= read_excel( "Data/SIOFA_all_tag_operation_link-2025_rev1.xlsx",sheet ='tag_recapture')
 
 # biological sampling
-Bio= read_excel( "Data/SIOFA_3b_fish_sampling.xlsx")
+Bio= read_excel( "Data/SIOFA_3b_fish_sampling-2025.xlsx")
+
+
+# extract linelenght from other DataSet
+LL_LineLength= read_excel("Data/SIOFA-TOP-Data-3b-2025-09-Release_rev2.xlsx",sheet="CatchEffort_rev2")
+LL_LineLength_Select=LL_LineLength %>% dplyr::select(HBHfoID,
+                                                     LineLenght) %>%
+  dplyr::rename(opeID=HBHfoID) %>% mutate(opeID=as.character(opeID))
+
+LL=LL %>% left_join(LL_LineLength_Select)
+
 
 # Catch ------------------------------------------------------------------------
 # filter species & area 
@@ -94,7 +103,7 @@ Catch = LL %>% mutate(Season = SIOFA_Season(fishopSetStartDate)) %>%
   filter(Season>=minSeason & Season<=maxSeason & speciesFAOCode %in%c('TOP')) %>% 
   filter(Subarea == '3b')
 
-#Assign MUs 
+# Assign MUs 
 Catch=assign_areas_rev(Input=Catch,
                    NamesIn = c("fishopSetStartLatitude","fishopSetStartLongitude"),
                    Polys = c('MU'),
@@ -105,8 +114,10 @@ Catch=assign_areas_rev(Input=Catch,
 Catch = Catch %>% filter(MU %in% Mu) 
 
 
+
+
 # Release ----------------------------------------------------------------------
-#Warnings multiple relationship 
+# Warnings multiple relationship 
 Release = left_join(LinkOP_release, Rel, by="obs_foID", multiple="first")
 
 Release = Release %>%  mutate(Season = SIOFA_Season(Dat_release)) %>% 
@@ -123,6 +134,92 @@ Release=assign_areas_rev(Input=Release,
 
 Release = Release %>% filter(MU %in% Mu) 
 
+## Table of catches and releases and plots ---------------------------------
+Table_Recap=Catch %>%
+  dplyr::group_by(Season, MU, Subarea) %>%
+  dplyr::summarise(
+    Catch = sum(Catch_Kg, na.rm = TRUE) / 1000,
+    .groups = "drop"
+  )
+
+
+# PLOT
+PlotMap <- Release %>%  
+  mutate(MU = if_else(is.na(MU), "Outside_MA", MU)) %>% 
+  ggplot(
+    aes(
+      x = Lon_release,
+      y = Lat_release,
+      color = MU,
+      shape = as.factor(Season)
+    )
+  ) +
+  geom_point(size = 2, alpha = 0.7) +
+  coord_cartesian(ylim=c(NA,-40))+ # to be removed if needed
+  labs(
+    shape = "Season",
+    x="Longitude",
+    y="Latitude"
+  )+
+  geom_sf(
+    data = MU,
+    aes(fill = name),      # << polygon MU
+    inherit.aes = FALSE,
+    color = "black",
+    alpha = 0.3,
+    linewidth = 0.6
+  ) +
+    scale_color_manual(
+      values = c(
+        DC      = "#1b9e77",
+        SIR     = "#d95f02",
+        Outside_MA = "red"
+      ),
+    name = "Release"
+  ) +
+  scale_fill_manual(      # polygon colors
+    values = c(
+      DC  = "#1b9e77",
+      SIR = "#d95f02"
+    ),
+    name = "MA"
+  ) +
+  coord_sf(ylim = c(NA, -40))+
+  theme_minimal()
+
+PlotMap
+
+
+ggsave(
+  filename = "Output/Release_MAP.png",
+  plot = PlotMap,
+  width = 10,
+  height = 5,
+  dpi = 300
+)
+
+# TABLES 
+Table_Recap=Table_Recap %>% left_join(Release %>%
+                            dplyr::group_by(Season, MU, Subarea) %>%
+                            dplyr::summarise(
+                              Release = n(),
+                              .groups = "drop")) %>%
+    mutate(Ratio=Release/Catch)
+
+
+write.csv(Table_Recap,paste0("Output/Output_Table_Recap_",Time,".csv"),row.names = FALSE)
+
+
+Release_Recap=Release %>% mutate(year=year(Dat_release)) %>% #filter(MU != "SIR") %>% 
+  dplyr::group_by(year, MU, Subarea) %>%
+  dplyr::summarise(
+    Catch = n(),
+    .groups = "drop"
+  )
+
+write.csv(Release_Recap,paste0("Output/Output_Release_Recap_",Time,".csv"),row.names = FALSE)
+
+
 #tag code
 Release$tag_code_1 = paste(Release$tagrel1Type,
                            Release$tagrel1Colour,
@@ -133,10 +230,12 @@ Release$tag_code_2 = paste(Release$tagrel2Type,
                              Release$tagrel2Colour,
                              Release$tagrel2Number,
                              Release$tagrel2Wording, sep="+")
+
 # Length weigth data -----------------------------------------------------------
 Biology = Bio %>%  mutate(Season = SIOFA_Season(SettingStartDatetime)) %>% 
-  filter(Season>=minSeason & Season<=maxSeason ) %>%  #speciesFAOCode %in%c('TOP')
-  filter(SubArea == '3b')
+  filter(Season>=minSeason & Season<=maxSeason ) %>% 
+  #speciesFAOCode %in%c('TOP') %>% 
+  filter(Subarea == '3b')
 
 #Assign MUs 
 Biology=assign_areas_rev(Input=Biology,
@@ -149,6 +248,142 @@ Biology=assign_areas_rev(Input=Biology,
 Biology = Biology %>% filter(MU %in% Mu) 
 
 
+## Tag Overlap -------------------------------------------------------------
+
+DF_len <- bind_rows(
+  Release %>%
+    filter(MU == "DC") %>%
+    transmute(
+      Length = Length_release,
+      Season = Season,
+      Source = "Release"
+    ),
+  Biology %>%
+    filter(MU == "DC") %>%
+    transmute(
+      Length = bsLength_cm,
+      Season = Season,
+      Source = "Catch"
+    )
+)
+
+PlotOverlap=ggplot(
+  DF_len,
+  aes(x = Length, color = Source, fill = Source)
+) +
+  geom_density(alpha = 0.4) +
+  facet_wrap(~ Season, scales = "free_y") +
+  labs(
+    x = "Length (cm)",
+    y = "Density",
+    color = "",
+    fill = ""
+  ) +
+  theme_minimal()
+
+ggsave(
+  filename = "Output/TagOverlap.png",
+  plot = PlotOverlap,
+  width = 10,
+  height = 5,
+  dpi = 300
+)
+
+
+# Build combined dataset   
+# Should be weighted per number of individual per lines
+# (not done since the data is not available)
+DF_len <- bind_rows(
+  Release %>% filter(MU == "DC") %>%
+    transmute(Length = Length_release, Season = Season, Source = "Release"),
+  Biology %>% filter(MU == "DC") %>%
+    transmute(Length = bsLength_cm, Season = Season, Source = "Catch")
+) %>%
+  filter(is.finite(Length), !is.na(Season))
+
+
+
+# KDE overlap: continuouis option
+overlap_kde <- function(x1, x2, n = 2048) {
+  rng <- range(c(x1, x2), na.rm = TRUE)
+  grid <- seq(rng[1], rng[2], length.out = n)
+  
+  d1 <- density(x1, from = rng[1], to = rng[2], n = n)
+  d2 <- density(x2, from = rng[1], to = rng[2], n = n)
+  
+  dx <- grid[2] - grid[1]
+  sum(pmin(d1$y, d2$y)) * dx
+}
+
+Overlap_by_season_kde <- DF_len %>%
+  group_by(Season) %>%
+  dplyr::summarise(
+    n_release = sum(Source == "Release"),
+    n_biology = sum(Source == "Catch"),
+    overlap = overlap_kde(Length[Source == "Release"], Length[Source == "Catch"]),
+    .groups = "drop"
+  )
+
+write.csv(Overlap_by_season_kde,paste0("Output/Output_Overlap_by_season_kde",Time,".csv"),row.names = FALSE)
+
+
+# 10Cm bin overlap: CCAMLR method
+PlotOverlap10cm=ggplot(DF_len, aes(x = Length, fill = Source, colour = Source)) +
+  geom_histogram(
+    aes(y = after_stat(density)),
+    binwidth = 10,
+    boundary = 0,
+    position = "identity",
+    alpha = 0.4
+  ) +
+  facet_wrap(~ Season) +
+  labs(
+    x = "Length (cm)",
+    y = "Density",
+    fill= "",
+    colour=""
+  ) +
+  theme_minimal()
+
+ggsave(
+  filename = "Output/PlotOverlap10cm.png",
+  plot = PlotOverlap10cm,
+  width = 10,
+  height = 5,
+  dpi = 300
+)
+
+overlap_hist_10cm <- function(x1, x2) {
+  rng <- range(c(x1, x2), na.rm = TRUE)
+  breaks <- seq(
+    floor(rng[1] / 10) * 10,
+    ceiling(rng[2] / 10) * 10,
+    by = 10
+  )
+  
+  h1 <- hist(x1, breaks = breaks, plot = FALSE)
+  h2 <- hist(x2, breaks = breaks, plot = FALSE)
+  
+  p1 <- h1$counts / sum(h1$counts)
+  p2 <- h2$counts / sum(h2$counts)
+  
+  sum(pmin(p1, p2))
+}
+
+Overlap_by_season <- DF_len %>%
+  group_by(Season) %>%
+  dplyr::summarise(
+    overlap = overlap_hist_10cm(
+      Length[Source == "Release"],
+      Length[Source == "Catch"]
+    ),
+    .groups = "drop"
+  )
+
+write.csv(Overlap_by_season,paste0("Output/Output_Overlap_by_season",Time,".csv"),row.names = FALSE)
+
+
+
 #Estimate fish weigth ----------------------------------------------------------
 Release$Est_weigth_release = est_fish_weight_rev(length_weight_data=Biology, length_data= Release)
 
@@ -158,11 +393,27 @@ ReleaseCatch_cor = Release %>% group_by(opeID) %>% dplyr::summarise(Weigth=sum(E
 Catch <- left_join(Catch, ReleaseCatch_cor, by="opeID")
 
 #Recapture ---------------------------------------------------------------------
-Recapture = left_join(LinkOP_recapture, Rec, by="obs_foID", multiple="first")
+Recapture = left_join(LinkOP_recapture, Rec, by="obs_foID", multiple="first")  #Scary to use multiple=First !
 
 Recapture = Recapture %>%  mutate(Season = SIOFA_Season(Dat_recapture)) %>% 
-  filter(Season>=minSeason & Season<=maxSeason ) %>%  #speciesFAOCode %in%c('TOP')
-  filter(Subarea == '3b')
+  filter(Season>=minSeason & Season<=maxSeason ) #%>%  #speciesFAOCode %in%c('TOP')
+  # filter(Subarea == '3b')  #FMG Issue here don't do this here but after assigning !
+
+
+DuplicatedFOID=Rec %>% 
+  group_by(obs_foID) %>% 
+  filter(n() > 1) %>% 
+  ungroup()
+
+Duplicated_Recapture=Recapture %>% 
+  group_by(obs_foID) %>% 
+  filter(n() > 1) %>% 
+  ungroup()
+
+Duplicated_Link=LinkOP_recapture %>% 
+  group_by(obs_foID) %>% 
+  filter(n() > 1) %>% 
+  ungroup()
 
 #Assign MUs 
 Recapture=assign_areas_rev(Input=Recapture,
@@ -172,7 +423,7 @@ Recapture=assign_areas_rev(Input=Recapture,
                          Buffer=0, 
                          NamesOut=c('MU'))
 
-#Recapture = Recapture %>% filter(MU %in% Mu) 
+Recapture = Recapture %>% filter(MU %in% Mu) 
 
 #tag code
 Recapture$tag_code_1 = paste(Recapture$tagrec1Type,
@@ -212,7 +463,37 @@ Rlinked=assign_areas_rev(Input=Rlinked,
                          Buffer=0, 
                          NamesOut=c('Recapture_MU'))
 
-#Rlinked = Rlinked %>% filter(Recapture_MU %in% Mu, Release_MU %in% Mu) 
+Rlinked = Rlinked %>% filter(Recapture_MU %in% Mu, Release_MU %in% Mu) 
+
+
+
+# FMG Issues with date of release, used the ones from station when no data --------
+Flinks_FMG= read_excel("Data/Tag_SIOFA_Clara.xlsx")
+New_data=Flinks_FMG %>% 
+  filter(SIOFAtagrelID  %in%
+          c( Rlinked %>% 
+           filter(Release_Date == as.Date("2021-01-01")) %>% dplyr::select(Release_TagID,Release_Date) %>% pull(Release_TagID)
+          ) ) %>% dplyr::select(SIOFAtagrelID,tagrelDate)
+
+# Getting Rlinked with proper dates !
+Rlinked=Rlinked %>% 
+  left_join(
+    New_data %>% 
+      select(Release_TagID = 1, New_Release_Date = 2),
+    by = "Release_TagID"
+  ) %>% 
+  mutate(
+    Release_Date = if_else(
+      !is.na(New_Release_Date),
+      as.Date(New_Release_Date),
+      Release_Date
+    )
+  ) %>% 
+  select(-New_Release_Date) %>% 
+  mutate(Release_Season = SIOFA_Season(Release_Date))
+
+
+
 
 #Merge ambiguous links
 # Links=Disambiguator(Links=Links,
@@ -267,9 +548,14 @@ L_TOP=Flinks[Flinks$Recapture_MU%in%Mu & Flinks$species3ACode=='TOP',] #TOP
 Flinks=rbind(L_TOP)
 rm(L_TOP)
 
-Lcounts=dplyr::summarise(group_by(Flinks,Recapture_MU,Recapture_Season),n=n(),.groups = "drop")
+Flinks=Flinks %>% mutate(TaL=Recapture_Date-Release_Date,SaS=Recapture_Season-Release_Season) %>% filter(Release_Area=="SIOFA")
 
+
+
+Lcounts=dplyr::summarise(group_by(Flinks,Release_Season,Recapture_Season),n=n(),.groups = "drop")
+Lcounts %>% arrange(Recapture_Season)
 #Export filtered Links
+write.csv(Lcounts,paste0("Output/Output_Recaptures_Lcounts_",Time,".csv"),row.names = FALSE)
 write.csv(Flinks,paste0("Output/Output_Recaptures_Linked_Filtered_",Time,".csv"),row.names = FALSE)
 rm(Flinks)
 
