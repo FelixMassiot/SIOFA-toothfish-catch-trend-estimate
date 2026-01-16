@@ -220,9 +220,13 @@ for (RB in Management_Units){
   target_species<-"TOP"#ifelse(RB%in%TOP_target_RBs,"TOP","TOA")
   
   # Restrict Recapture data to relevant management unit 
-  Rec_RB_CHAP=Rlinked[which(Rlinked$Release_MU==RB
-                          & Rlinked$Recapture_MU==RB),]
-  
+  if (RB=="DC"){
+  Rec_RB_CHAP <- 
+    readRDS("Data/data_Recapt_DC_15-01-2026.rds")
+  }else{
+    Rec_RB_CHAP=Rlinked[which(Rlinked$Release_MU==RB
+                              & Rlinked$Recapture_MU==RB),]
+  }
   # all other RBs recaptures are limited within 3 years of release
   Rec_RB_CHAP=Rec_RB_CHAP[which(Rec_RB_CHAP$Recapture_Season-Rec_RB_CHAP$Release_Season<=3),]
   
@@ -288,11 +292,16 @@ for (RB in Management_Units){
      #   }
     #  }
     
-    if(min(Tag_RB_CHAP$Year)>=y-3){
-      Season_releases=seq(y-1,y,1)
-    }else{
-      Season_releases=seq(y-3,y,1)
-    }
+    
+    
+    # FMG found issues: makes no sense to limit to one year before recapture, in text it is 3 years.
+    # if(min(Tag_RB_CHAP$Year)>=y-3){
+    #   Season_releases=seq(y-1,y,1) # WHY? 
+    # }else{
+    #   Season_releases=seq(y-3,y,1)
+    # }
+    
+    
           
     # Nbhooks 
     Nbhook_RB_CHAP =Catch_Effort_RB_CHAP %>% filter(Season%in%y) %>% dplyr::summarise(HooksSet=sum(HooksSet)) %>% 
@@ -387,9 +396,16 @@ for (RB in Management_Units){
   write.csv(store_B_est_all,paste0("Output/Output_Bestimates_",Time,".csv"),row.names = FALSE)
   
   
-  store_B_est_most_recent <- ddply(store_B_est_all%>% filter(Ref_area==RefArea.selected | is.na(Ref_area)) ,
-                                   .(Species,Method,RB),function(x){x[which.max(x$Season),]},.drop=FALSE)
-  # remove hauls and catch limit 
+  # store_B_est_most_recent <- ddply(store_B_est_all%>% filter(Ref_area==RefArea.selected | is.na(Ref_area)) ,
+  #                                  .(Species,Method,RB),function(x){x[which.max(x$Season),]},.drop=FALSE)
+# getting rid of plyr using dplyr instead
+  store_B_est_most_recent <- store_B_est_all %>%
+    filter(Ref_area == RefArea.selected | is.na(Ref_area)) %>%
+    group_by(Species, Method, RB) %>%
+    slice_max(Season, n = 1, with_ties = FALSE) %>%
+    ungroup()
+  
+    # remove hauls and catch limit 
   store_B_est_most_recent=subset(store_B_est_most_recent, select=-RB_N_Hauls)
   store_B_est_most_recent=store_B_est_most_recent[order(store_B_est_most_recent$RB),]
   store_B_est_most_recent$Catch_lim=store_B_est_most_recent$Est*0.04
