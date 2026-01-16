@@ -122,6 +122,7 @@ HarvestRateTrend = 0.04 #Other harvest rate
 
 #List MU in the proper order
 Mu=c("DC", "SIR")
+Mu=c("DC")
 
 #Set number of bootstrap iterations
 n_boot=10000
