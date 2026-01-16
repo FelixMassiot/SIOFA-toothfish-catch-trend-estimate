@@ -83,7 +83,7 @@ Min_Season = Est_Season-4
 
 # Reference areas
 RefArea=c("HIMI","CI")
-RefArea.selected <- "CI"
+RefArea.selected <- "HIMI"
 # RefArea.selected=c('HIMI')
 
 # Set biomass and CV for Reference Areas
@@ -115,7 +115,8 @@ if (CPUE_mod=='dist'){
 n_min_chapman=3
 
 # Moving average up to 3 years for CPUE or not 
-Tail<-FALSE
+Tail<-FALSE # or TRUE
+
 
 #Harvest rate used for the trend decision 
 HarvestRateTrend = 0.04 #Other harvest rate

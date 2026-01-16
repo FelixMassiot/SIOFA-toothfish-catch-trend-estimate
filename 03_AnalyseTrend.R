@@ -20,7 +20,7 @@ avg_C = as.data.frame(sf::st_drop_geometry(avg_C))
 write.csv(avg_C, paste0("Output/Average_catch",".csv"),row.names=F)
 
 #Load Seasonal Estimates
-CPUE_est=read.csv(paste0("Output/Output_CPUE_3yMedian_",Time,".csv"), stringsAsFactors = FALSE)
+CPUE_est_tot=read.csv(paste0("Output/Output_CPUE_3yMedian_",Time,".csv"), stringsAsFactors = FALSE)
 Chap_est=read.csv(paste0("Output/Output_Chapman_",Time,".csv"), stringsAsFactors = FALSE)
 
 
@@ -44,9 +44,9 @@ for(i in indx){
 }
 rm(i,indx)
 
-
+for (RefArea.selected in unique(RefArea)){
 #Get estimates
-CPUE_est = CPUE_est%>% filter(Ref_area==RefArea.selected)
+CPUE_est = CPUE_est_tot%>% filter(Ref_area==RefArea.selected)
 CPUE_all=CPUE_est
 Chap_all=Chap_est
 
@@ -160,7 +160,7 @@ for(a in sort(unique(trends$Area))){
   rbs=unique(trends$RB[trends$Area==a])
   mf=n2mfrow(length(rbs)+2)
   
-  png(filename=paste0("Output/Trends_RBs_Area_",a,"_",Est_Season,"_",Time,".png"),
+  png(filename=paste0("Output/Trends_RBs_Area_",a,"_",Est_Season,"_",RefArea.selected,"_",Time,".png"),
       width = mf[2]*800, height = mf[1]*600,res=200)
   
   par(mfrow=mf)
@@ -275,10 +275,10 @@ for(a in sort(unique(trends$Area))){
 }#end of per-Area loop
 
 
-
-rm(B_Recent)
-rm(Chap_all,Chap_est,Chap_trends)
-rm(CPUE_all,CPUE_est,CPUE_trends)
+# 
+# rm(B_Recent)
+# rm(Chap_all,Chap_est,Chap_trends)
+# rm(CPUE_all,CPUE_est,CPUE_trends)
 rm(mod2_beta,mod4_beta,model.2,model.4,out)
 rm(tmp_ch,tmp_cp,b_ch,b_cp,mf,r,rbs,suff_recaps,XL,YL)
 
@@ -475,7 +475,7 @@ colnames(trends)=c(
   "PCLx1.2",
   paste0("Recommended CL for ",Est_Season+1)
 )
-write.csv(trends, paste0("Output/Trends_",Est_Season,"_and_CLs_",Time,".csv"),row.names=F)
+write.csv(trends, paste0("Output/Trends_",Est_Season,"_and_CLs_",RefArea.selected,"_",Time,".csv"),row.names=F)
 
 
 #Comment/uncomment below to work on the diagram ! DO NOT LEAVE UNCOMMENTED
@@ -663,4 +663,4 @@ graph[nodesep=1]
 
 save_png(Diag,paste0("Output/Diagram_",Est_Season,"_",Time,".png"))
 
-
+}
