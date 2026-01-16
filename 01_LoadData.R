@@ -118,11 +118,45 @@ Catch = Catch %>% filter(MU %in% Mu)
 
 # Release ----------------------------------------------------------------------
 # Warnings multiple relationship 
-Release = left_join(LinkOP_release, Rel, by="obs_foID", multiple="first")
+# this is takins the first match fromLinkOP_release to Rel but when you have multiple obs_foID and multple release it duplicates the release
+# Run this to test
+
+# LinkOP_release %>% filter(obs_foID=="O10887") # three different tagrelID with same IDs
+# Rel %>% filter(obs_foID=="O10887") # 3 different fish were tag with this ID
+# Release = left_join(LinkOP_release, Rel, by="obs_foID", multiple="first") ## What is this doing? it generates lot of pseudo duplicate and loose data.
+# Release %>% filter(obs_foID=="O10887") # Release duplicates because it is taking the first occurence
+
+
+LinkOP_release %>%
+  filter(
+    duplicated(select(., obs_foID , opeID )) |
+      duplicated(select(., obs_foID, opeID ), fromLast = TRUE)
+  )
+
+
+# FMG  From what I understand, you would want to get 1 with 1, second with second and so on
+LinkOP_release2 <- LinkOP_release %>%
+  group_by(obs_foID) %>%
+  arrange(tagrelID, .by_group = TRUE) %>%   # choose the ordering you want
+  mutate(idx = row_number()) %>%
+  ungroup()
+
+Rel2 <- Rel %>%
+  group_by(obs_foID) %>%
+  arrange(Dat_release, tagrel1Number, .by_group = TRUE) %>%  # choose the ordering you want
+  mutate(idx = row_number()) %>%
+  ungroup()
+
+Release <- LinkOP_release2 %>%
+  left_join(Rel2, by = c("obs_foID", "idx"))
+
+
+# Release<-Rel
 
 Release = Release %>%  mutate(Season = SIOFA_Season(Dat_release)) %>% 
   filter(Season>=minSeason & Season<=maxSeason ) %>%  #speciesFAOCode %in%c('TOP')
   filter(Subarea == '3b')
+
 
 #Assign MUs 
 Release=assign_areas_rev(Input=Release,
@@ -133,6 +167,8 @@ Release=assign_areas_rev(Input=Release,
                        NamesOut=c('MU'))
 
 Release = Release %>% filter(MU %in% Mu) 
+
+write.csv(Release,paste0("Output/Output_ReleaseMU_",Time,".csv"),row.names = FALSE)
 
 ## Table of catches and releases and plots ---------------------------------
 Table_Recap=Catch %>%
@@ -385,6 +421,7 @@ write.csv(Overlap_by_season,paste0("Output/Output_Overlap_by_season",Time,".csv"
 
 
 #Estimate fish weigth ----------------------------------------------------------
+
 Release$Est_weigth_release = est_fish_weight_rev(length_weight_data=Biology, length_data= Release)
 
 #Correct catch data ------------------------------------------------------------
@@ -393,7 +430,38 @@ ReleaseCatch_cor = Release %>% group_by(opeID) %>% dplyr::summarise(Weigth=sum(E
 Catch <- left_join(Catch, ReleaseCatch_cor, by="opeID")
 
 #Recapture ---------------------------------------------------------------------
-Recapture = left_join(LinkOP_recapture, Rec, by="obs_foID", multiple="first")  #Scary to use multiple=First !
+# Same comment that for release
+#Recapture = left_join(LinkOP_recapture, Rec, by="obs_foID", multiple="first")  #Scary to use multiple=First ! Same as release, there are some duplicates there !!
+
+# Some duplicates 
+LinkOP_recapture %>%
+  filter(
+    if_any(
+      everything(),
+      ~ duplicated(.) | duplicated(., fromLast = TRUE)
+    )
+  )
+
+
+# FMG  From what I understand, you would want to get 1 with 1, second with second and so on
+LinkOP_recapture2 <- LinkOP_recapture %>%
+  group_by(obs_foID) %>%
+  arrange(tagrecID , .by_group = TRUE) %>%   # choose the ordering you want
+  mutate(idx = row_number()) %>%
+  ungroup()
+
+Rec2 <- Rec %>%
+  group_by(obs_foID) %>%
+  arrange(Dat_recapture, tagrec1Number, .by_group = TRUE) %>%  # choose the ordering you want
+  mutate(idx = row_number()) %>%
+  ungroup()
+
+Recapture <- LinkOP_recapture2 %>%
+  left_join(Rec2, by = c("obs_foID", "idx"))
+
+
+# Recapture = left_join(LinkOP_recapture, Rec, by="obs_foID")
+# Recapture = Rec  #Scary to use multiple=First !
 
 Recapture = Recapture %>%  mutate(Season = SIOFA_Season(Dat_recapture)) %>% 
   filter(Season>=minSeason & Season<=maxSeason ) #%>%  #speciesFAOCode %in%c('TOP')
@@ -558,7 +626,6 @@ Lcounts %>% arrange(Recapture_Season)
 write.csv(Lcounts,paste0("Output/Output_Recaptures_Lcounts_",Time,".csv"),row.names = FALSE)
 write.csv(Flinks,paste0("Output/Output_Recaptures_Linked_Filtered_",Time,".csv"),row.names = FALSE)
 rm(Flinks)
-
 
 #Data processing ####
 cat("###Data Processing start###########################", file = Rcard, sep = "\n")
